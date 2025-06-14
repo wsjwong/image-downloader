@@ -226,7 +226,6 @@ https://example.com/image3.png"
 
             downloadBtn.disabled = true;
             showStatus(`Found ${urls.length} images. Starting download...`, 'info');
-            progressDiv.style.display = 'block';
 
             const zip = new JSZip();
             let successCount = 0;
@@ -236,11 +235,12 @@ https://example.com/image3.png"
                 const url = urls[i];
                 const baseFilename = `${i + 1}`;
                 
-                progressDiv.textContent = `Processing ${i + 1} of ${urls.length}...`;
+                // Update status with progress
+                showStatus(`Processing ${i + 1} of ${urls.length}...`, 'info');
                 
                 try {
-                    // Use a CORS proxy to fetch the image
-                    const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`;
+                    // Use our own serverless function as proxy
+                    const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
                     const response = await fetch(proxyUrl);
                     
                     if (response.ok) {
@@ -251,42 +251,31 @@ https://example.com/image3.png"
                         zip.file(finalFilename, blob);
                         successCount++;
                     } else {
-                        throw new Error(`HTTP ${response.status}`);
+                        // Try to get error details from the response
+                        let errorMessage = `HTTP ${response.status}`;
+                        try {
+                            const errorData = await response.json();
+                            errorMessage = errorData.error || errorMessage;
+                        } catch (e) {
+                            // If we can't parse the error response, use the status
+                        }
+                        throw new Error(errorMessage);
                     }
                 } catch (error) {
                     console.error(`Failed to download ${url}:`, error);
                     
-                    // Try alternative proxy
-                    try {
-                        const altProxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-                        const response = await fetch(altProxyUrl);
-                        
-                        if (response.ok) {
-                            const blob = await response.blob();
-                            const extension = getFileExtension(url, response.headers.get('content-type'));
-                            const finalFilename = `${baseFilename}.${extension}`;
-                            
-                            zip.file(finalFilename, blob);
-                            successCount++;
-                        } else {
-                            throw new Error(`Alt proxy failed: HTTP ${response.status}`);
-                        }
-                    } catch (altError) {
-                        console.error(`Alt proxy also failed for ${url}:`, altError);
-                        
-                        // Create a text file with the URL for manual download
-                        const extension = getFileExtension(url, null);
-                        const urlBlob = new Blob([`Image URL: ${url}\n\nThis image could not be downloaded automatically.\nRight-click the URL above and select "Save link as..." to download manually.`], {type: 'text/plain'});
-                        zip.file(`${baseFilename}_url.txt`, urlBlob);
-                        failedCount++;
-                    }
+                    // Create a text file with the URL for manual download
+                    const extension = getFileExtension(url, null);
+                    const urlBlob = new Blob([`Image URL: ${url}\n\nThis image could not be downloaded automatically.\nError: ${error.message}\n\nRight-click the URL above and select "Save link as..." to download manually.`], {type: 'text/plain'});
+                    zip.file(`${baseFilename}_url.txt`, urlBlob);
+                    failedCount++;
                 }
                 
                 // Small delay between downloads
                 await new Promise(resolve => setTimeout(resolve, 300));
             }
 
-            progressDiv.textContent = 'Creating zip file...';
+            showStatus('Creating zip file...', 'info');
             
             try {
                 const zipBlob = await zip.generateAsync({type: 'blob'});
@@ -326,99 +315,6 @@ https://example.com/image3.png"
             }
         }
 
-        async function downloadImageCanvas(url, baseFilename, zip) {
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                
-                // Try without crossOrigin first
-                img.onload = function() {
-                    try {
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        ctx.drawImage(img, 0, 0);
-                        
-                        canvas.toBlob((blob) => {
-                            if (blob) {
-                                const extension = getFileExtension(url, null);
-                                const finalFilename = `${baseFilename}.${extension}`;
-                                zip.file(finalFilename, blob);
-                                resolve();
-                            } else {
-                                reject(new Error('Failed to create blob from canvas'));
-                            }
-                        }, 'image/png');
-                    } catch (error) {
-                        reject(error);
-                    }
-                };
-                
-                img.onerror = () => {
-                    // Try with crossOrigin if first attempt fails
-                    const img2 = new Image();
-                    img2.crossOrigin = 'anonymous';
-                    
-                    img2.onload = function() {
-                        try {
-                            const canvas = document.createElement('canvas');
-                            const ctx = canvas.getContext('2d');
-                            canvas.width = img2.width;
-                            canvas.height = img2.height;
-                            ctx.drawImage(img2, 0, 0);
-                            
-                            canvas.toBlob((blob) => {
-                                if (blob) {
-                                    const extension = getFileExtension(url, null);
-                                    const finalFilename = `${baseFilename}.${extension}`;
-                                    zip.file(finalFilename, blob);
-                                    resolve();
-                                } else {
-                                    reject(new Error('Failed to create blob from canvas'));
-                                }
-                            }, 'image/png');
-                        } catch (error) {
-                            reject(error);
-                        }
-                    };
-                    
-                    img2.onerror = () => reject(new Error('Failed to load image with canvas method'));
-                    img2.src = url;
-                };
-                
-                img.src = url;
-            });
-        }
-
-        async function downloadImageProxy(url, baseFilename, zip) {
-            // Try multiple CORS proxy services
-            const proxies = [
-                'https://api.allorigins.win/raw?url=',
-                'https://cors-anywhere.herokuapp.com/',
-                'https://thingproxy.freeboard.io/fetch/'
-            ];
-            
-            for (const proxy of proxies) {
-                try {
-                    const proxyUrl = proxy + encodeURIComponent(url);
-                    const response = await fetch(proxyUrl);
-                    
-                    if (response.ok) {
-                        const blob = await response.blob();
-                        const extension = getFileExtension(url, response.headers.get('content-type'));
-                        const finalFilename = `${baseFilename}.${extension}`;
-                        
-                        zip.file(finalFilename, blob);
-                        return; // Success
-                    }
-                } catch (error) {
-                    console.log(`Proxy ${proxy} failed:`, error);
-                    continue; // Try next proxy
-                }
-            }
-            
-            throw new Error('All proxy methods failed');
-        }
 
         function getFileExtension(url, contentType) {
             // Try to get extension from URL first
