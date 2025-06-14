@@ -158,15 +158,3 @@ Thumbs.db
 # package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
-
-# Logo and icon files
-*.png
-*.ico
-*.jpg
-*.jpeg
-*.gif
-*.svg
-*.webp
-logo*
-favicon*
-icon*
