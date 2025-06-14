@@ -2,6 +2,10 @@
 
 A simple web tool to download multiple images from URLs and package them into a zip file.
 
+**🌐 Live Demo**: [https://downloader.simplemetrics.xyz](https://downloader.simplemetrics.xyz)
+
+**Made by**: [Simple Metrics](https://simplemetrics.xyz)
+
 ## Features
 
 - **Bulk Download**: Paste multiple image URLs (supports tab, comma, or newline-separated input)
