@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Downloader</title>
+    
+    <!-- Favicon and app icons -->
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="48.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="96.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="android-chrome-192x192.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="android-chrome-192x192.png">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background-color: #2d2d2d;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .logo {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 1rem;
+            display: block;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        .header a:hover .logo {
+            transform: scale(1.05);
+            opacity: 0.8;
+        }
+
+        h1 {
+            text-align: center;
+            margin: 0;
+            font-size: 2rem;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .input-section {
+            margin-bottom: 2rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #b0b0b0;
+        }
+
+        textarea {
+            width: 100%;
+            height: 200px;
+            background-color: #3a3a3a;
+            border: 2px solid #4a4a4a;
+            border-radius: 8px;
+            padding: 1rem;
+            color: #e0e0e0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: vertical;
+            transition: border-color 0.3s ease;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+
+        textarea::placeholder {
+            color: #888;
+        }
+
+        .button-section {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        button {
+            background: linear-gradient(135deg, #007acc, #005a9e);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 200px;
+        }
+
+        button:hover {
+            background: linear-gradient(135deg, #0088dd, #006bb3);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0, 122, 204, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .status {
+            text-align: center;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            font-weight: 500;
+        }
+
+        .status.info {
+            background-color: #1a4d66;
+            color: #87ceeb;
+        }
+
+        .status.success {
+            background-color: #1a4d2e;
+            color: #90ee90;
+        }
+
+        .status.error {
+            background-color: #4d1a1a;
+            color: #ff6b6b;
+        }
+
+        .progress {
+            margin-top: 1rem;
+            text-align: center;
+            color: #b0b0b0;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="http://simplemetrics.xyz" target="_blank">
+                <img src="logo_transparent.png" alt="Image Downloader Logo" class="logo">
+            </a>
+            <h1>Image Downloader</h1>
+        </div>
+        
+        <div class="input-section">
+            <label for="urlInput">Image URLs (tab, comma, or newline separated):</label>
+            <textarea 
+                id="urlInput" 
+                placeholder="https://example.com/image1.png
+https://example.com/image2.png
+https://example.com/image3.png"
+            ></textarea>
+        </div>
+
+        <div class="button-section">
+            <button id="downloadBtn" onclick="downloadImages()">Download All Images</button>
+        </div>
+
+        <div id="status" class="status" style="display: none;"></div>
+        <div id="progress" class="progress" style="display: none;"></div>
+        
+        <div style="text-align: center; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #4a4a4a;">
+            <p style="color: #888; font-size: 0.9rem;">
+                Made by <a href="http://simplemetrics.xyz" target="_blank" style="color: #007acc; text-decoration: none;">Simple Metrics</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        async function downloadImages() {
+            const urlInput = document.getElementById('urlInput');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const statusDiv = document.getElementById('status');
+            const progressDiv = document.getElementById('progress');
+            
+            const inputText = urlInput.value.trim();
+            
+            if (!inputText) {
+                showStatus('Please paste some image URLs first.', 'error');
+                return;
+            }
+
+            // Parse URLs from tab, comma, and newline-separated text
+            const urls = inputText
+                .split(/[\t\n\r,]+/)
+                .map(url => url.trim())
+                .filter(url => url && isValidUrl(url));
+
+            if (urls.length === 0) {
+                showStatus('No valid URLs found. Please check your input.', 'error');
+                return;
+            }
+
+            downloadBtn.disabled = true;
+            showStatus(`Found ${urls.length} images. Starting download...`, 'info');
+            progressDiv.style.display = 'block';
+
+            const zip = new JSZip();
+            let successCount = 0;
+            let failedCount = 0;
+
+            for (let i = 0; i < urls.length; i++) {
+                const url = urls[i];
+                const baseFilename = `${i + 1}`;
+                
+                progressDiv.textContent = `Processing ${i + 1} of ${urls.length}...`;
+                
+                try {
+                    // Use a CORS proxy to fetch the image
+                    const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`;
+                    const response = await fetch(proxyUrl);
+                    
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        const extension = getFileExtension(url, response.headers.get('content-type'));
+                        const finalFilename = `${baseFilename}.${extension}`;
+                        
+                        zip.file(finalFilename, blob);
+                        successCount++;
+                    } else {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                } catch (error) {
+                    console.error(`Failed to download ${url}:`, error);
+                    
+                    // Try alternative proxy
+                    try {
+                        const altProxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+                        const response = await fetch(altProxyUrl);
+                        
+                        if (response.ok) {
+                            const blob = await response.blob();
+                            const extension = getFileExtension(url, response.headers.get('content-type'));
+                            const finalFilename = `${baseFilename}.${extension}`;
+                            
+                            zip.file(finalFilename, blob);
+                            successCount++;
+                        } else {
+                            throw new Error(`Alt proxy failed: HTTP ${response.status}`);
+                        }
+                    } catch (altError) {
+                        console.error(`Alt proxy also failed for ${url}:`, altError);
+                        
+                        // Create a text file with the URL for manual download
+                        const extension = getFileExtension(url, null);
+                        const urlBlob = new Blob([`Image URL: ${url}\n\nThis image could not be downloaded automatically.\nRight-click the URL above and select "Save link as..." to download manually.`], {type: 'text/plain'});
+                        zip.file(`${baseFilename}_url.txt`, urlBlob);
+                        failedCount++;
+                    }
+                }
+                
+                // Small delay between downloads
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+
+            progressDiv.textContent = 'Creating zip file...';
+            
+            try {
+                const zipBlob = await zip.generateAsync({type: 'blob'});
+                const zipUrl = URL.createObjectURL(zipBlob);
+                
+                // Force download by setting proper headers
+                const a = document.createElement('a');
+                a.href = zipUrl;
+                a.download = 'images.zip';
+                a.style.display = 'none';
+                
+                // Force the download
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                
+                // Clean up
+                setTimeout(() => URL.revokeObjectURL(zipUrl), 1000);
+                
+                downloadBtn.disabled = false;
+                progressDiv.style.display = 'none';
+                
+                if (successCount > 0) {
+                    if (failedCount > 0) {
+                        showStatus(`Downloaded ${successCount} images, ${failedCount} failed. Zip file created!`, 'success');
+                    } else {
+                        showStatus(`Successfully downloaded all ${successCount} images as zip file!`, 'success');
+                    }
+                } else {
+                    showStatus('Could not download any images. Check the URLs and try again.', 'error');
+                }
+            } catch (error) {
+                console.error('Error creating zip:', error);
+                downloadBtn.disabled = false;
+                progressDiv.style.display = 'none';
+                showStatus('Error creating zip file.', 'error');
+            }
+        }
+
+        async function downloadImageCanvas(url, baseFilename, zip) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                
+                // Try without crossOrigin first
+                img.onload = function() {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0);
+                        
+                        canvas.toBlob((blob) => {
+                            if (blob) {
+                                const extension = getFileExtension(url, null);
+                                const finalFilename = `${baseFilename}.${extension}`;
+                                zip.file(finalFilename, blob);
+                                resolve();
+                            } else {
+                                reject(new Error('Failed to create blob from canvas'));
+                            }
+                        }, 'image/png');
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                
+                img.onerror = () => {
+                    // Try with crossOrigin if first attempt fails
+                    const img2 = new Image();
+                    img2.crossOrigin = 'anonymous';
+                    
+                    img2.onload = function() {
+                        try {
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            canvas.width = img2.width;
+                            canvas.height = img2.height;
+                            ctx.drawImage(img2, 0, 0);
+                            
+                            canvas.toBlob((blob) => {
+                                if (blob) {
+                                    const extension = getFileExtension(url, null);
+                                    const finalFilename = `${baseFilename}.${extension}`;
+                                    zip.file(finalFilename, blob);
+                                    resolve();
+                                } else {
+                                    reject(new Error('Failed to create blob from canvas'));
+                                }
+                            }, 'image/png');
+                        } catch (error) {
+                            reject(error);
+                        }
+                    };
+                    
+                    img2.onerror = () => reject(new Error('Failed to load image with canvas method'));
+                    img2.src = url;
+                };
+                
+                img.src = url;
+            });
+        }
+
+        async function downloadImageProxy(url, baseFilename, zip) {
+            // Try multiple CORS proxy services
+            const proxies = [
+                'https://api.allorigins.win/raw?url=',
+                'https://cors-anywhere.herokuapp.com/',
+                'https://thingproxy.freeboard.io/fetch/'
+            ];
+            
+            for (const proxy of proxies) {
+                try {
+                    const proxyUrl = proxy + encodeURIComponent(url);
+                    const response = await fetch(proxyUrl);
+                    
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        const extension = getFileExtension(url, response.headers.get('content-type'));
+                        const finalFilename = `${baseFilename}.${extension}`;
+                        
+                        zip.file(finalFilename, blob);
+                        return; // Success
+                    }
+                } catch (error) {
+                    console.log(`Proxy ${proxy} failed:`, error);
+                    continue; // Try next proxy
+                }
+            }
+            
+            throw new Error('All proxy methods failed');
+        }
+
+        function getFileExtension(url, contentType) {
+            // Try to get extension from URL first
+            const urlPath = new URL(url).pathname;
+            const urlExtension = urlPath.split('.').pop().toLowerCase();
+            
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(urlExtension)) {
+                return urlExtension;
+            }
+            
+            // Fall back to content type
+            if (contentType) {
+                const typeMap = {
+                    'image/jpeg': 'jpg',
+                    'image/jpg': 'jpg',
+                    'image/png': 'png',
+                    'image/gif': 'gif',
+                    'image/webp': 'webp',
+                    'image/bmp': 'bmp',
+                    'image/svg+xml': 'svg'
+                };
+                return typeMap[contentType.toLowerCase()] || 'png';
+            }
+            
+            // Default to png
+            return 'png';
+        }
+
+        function isValidUrl(string) {
+            try {
+                new URL(string);
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+        }
+
+        // Allow Enter key to trigger download
+        document.getElementById('urlInput').addEventListener('keydown', function(event) {
+            if (event.ctrlKey && event.key === 'Enter') {
+                downloadImages();
+            }
+        });
+    </script>
+</body>
+</html>
