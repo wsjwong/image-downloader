@@ -4,7 +4,6 @@
   "description": "A web app to download multiple images as a zip file",
   "main": "index.html",
   "scripts": {
-    "dev": "vercel dev",
     "build": "echo 'No build step required'",
     "start": "vercel dev"
   },
